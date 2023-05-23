@@ -63,7 +63,7 @@
              :error))
       (break))
     (set last-index (max 0 (- (length buf) 4)))
-    (ev/read conn chunk-size buf))
+    (:read conn chunk-size buf))
   head)
 
 (defn- query-string-accum
@@ -209,12 +209,12 @@
     (nil? body)
     (do
       (buffer/push buf "\r\n")
-      (ev/write conn buf))
+      (:write conn buf))
 
     (bytes? body)
     (do
       (buffer/format buf "Content-Length: %d\r\n\r\n%V" (length body) body)
-      (ev/write conn buf))
+      (:write conn buf))
 
     # default - iterate chunks
     (do
@@ -222,10 +222,10 @@
       (each chunk body
         (assert (bytes? chunk) "expected byte chunk")
         (buffer/format buf "%x\r\n%V\r\n" (length chunk) chunk)
-        (ev/write conn buf)
+        (:write conn buf)
         (buffer/clear buf))
       (buffer/format buf "0\r\n\r\n")
-      (ev/write conn buf)))
+      (:write conn buf)))
   (buffer/clear buf))
 
 (defn- read-until
@@ -238,7 +238,7 @@
     (break pos))
   (prompt :exit
     (forever
-      (ev/read conn 1 buf)
+      (:read conn 1 buf)
       (when-let [pos (peg/find needle buf start-index)]
         (return :exit pos)))))
 
@@ -257,7 +257,7 @@
     (def content-length (scan-number cl))
     (def remaining (- content-length (length buf)))
     (when (pos? remaining)
-      (ev/chunk conn remaining buf))
+      (:chunk conn remaining buf))
     (put req :body buf)
     (break buf))
 
@@ -287,8 +287,8 @@
         # Basic case: the buffer has been exhausted and hereonout we can read
         # from the socket directly.
         (do
-          (ev/chunk conn chunk-length body)
-          (ev/read conn 2 buf) # trailing CRLF (not included in chunk length proper)
+          (:chunk conn chunk-length body)
+          (:read conn 2 buf) # trailing CRLF (not included in chunk length proper)
           # Clear buffer out. We ain't gonna need it no more.
           (buffer/clear buf)
           (set i 0))
@@ -406,7 +406,7 @@
   * `:method` - HTTP method, as a string."
   [conn handler]
   (def handler (middleware handler))
-  (defer (ev/close conn)
+  (defer (:close conn)
 
     # Get request header
     (def buf (buffer/new chunk-size))
